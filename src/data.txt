@@ -1,3 +1,0 @@
-Sample data Line 1
-Sample data Line 2
-Sample data Line 3
