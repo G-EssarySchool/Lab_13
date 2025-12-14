@@ -1,49 +1,61 @@
 import java.util.ArrayList;
 import java.util.Scanner;
+import javax.swing.*;
+import java.io.File;
+import java.io.IOException;
 
 public class Main {
-    private static ArrayList<String> items = new ArrayList<>();
+
     private static Scanner scan = new Scanner(System.in);
-    public static void main(String[] args) {
+    private static ArrayList<String> items = new ArrayList<>();
 
-        boolean loaded;
-        boolean edited;
-        boolean saved;
+    private static boolean fileLoaded = false;
 
-        items.add("Kanye West");
-        items.add("JID");
-        items.add("Malcolm Todd");
-        items.add("Mac DeMarco");
-        items.add("Zach Templar");
-        items.add("J. Cole");
-        items.add("Travis Scott");
-        items.add("Tyler The Creator");
-        items.add("Drake");
-        items.add("Future");
+    private static boolean fileEdited = false;
+
+    private static boolean fileSaved = false;
+
+    private static String currentFilename = null;
+
+    public static void main(String[] args) throws IOException {
 
         boolean quit = false;
+
         while (!quit) {
 
-            printList();
+            printMenu();
 
-            System.out.println("\nMENU OPTIONS:");
-            System.out.println("A – Add an item to the list");
-            System.out.println("D – Delete an item from the list");
-            System.out.println("P – Print the list");
-            System.out.println("Q – Quit the program");
+            String choice = InputHelper.getRegExString(
+                    scan,
+                    "Choose an option: ",
+                    "[AaDdPpQqOoSsCc]"
+            ).toUpperCase();
 
-            String choice = InputHelper.getRegExString(scan, "Choose an option: ", "[AaDdPpQq]");
-
-            switch (choice.toUpperCase()) {
+            switch (choice) {
                 case "A":
                     addItem();
                     break;
+
                 case "D":
                     deleteItem();
                     break;
+
                 case "P":
                     printList();
                     break;
+
+                case "O":
+                    openFile();
+                    break;
+
+                case "S":
+                    saveFile();
+                    break;
+
+                case "C":
+                    clearList();
+                    break;
+
                 case "Q":
                     quit = quitProgram();
                     break;
@@ -51,30 +63,149 @@ public class Main {
         }
     }
 
-    public static void addItem() {
-        String newItem = InputHelper.getNonZeroLengthString(scan, "Enter an item to add: ");
-        items.add(newItem);
-        System.out.println("Item added!\n");
+    private static void printMenu() {
+        System.out.println("A - Add Item");
+        System.out.println("D - Delete Item");
+        System.out.println("P - Print List");
+        System.out.println("O - Open List File");
+        System.out.println("S - Save List File");
+        System.out.println("C - Clear List");
+        System.out.println("Q - Quit Program");
     }
 
-    public static void deleteItem() {
+    private static void addItem() {
+        String item = InputHelper.getNonZeroLengthString(scan, "Enter item to add: ");
+        items.add(item);
+        fileEdited = true;
+        fileSaved = false;
+        System.out.println("Item added.");
+    }
+
+    private static void deleteItem() {
         if (items.isEmpty()) {
-            System.out.println("List is empty—nothing to delete.\n");
+            System.out.println("List is empty — nothing to delete.");
             return;
         }
-        int indexToRemove = InputHelper.getRangedInt(scan, "Enter index of item to delete (0 - " + (items.size() - 1) + "): ", 0, items.size() - 1);
-        System.out.println("Removed: " + items.remove(indexToRemove));
+
+        printList();
+
+        int index = InputHelper.getRangedInt(
+                scan,
+                "Enter index to delete (0 - " + (items.size() - 1) + "): ",
+                0,
+                items.size() - 1
+        );
+
+        System.out.println("Removed: " + items.remove(index));
+        fileEdited = true;
+        fileSaved = false;
     }
 
-    public static void printList() {
+    private static void printList() {
+        if (items.isEmpty()) {
+            System.out.println("[ List is empty ]");
+            return;
+        }
+
         System.out.println("\nCurrent List:");
         for (int i = 0; i < items.size(); i++) {
             System.out.println(i + " - " + items.get(i));
         }
     }
 
-    public static boolean quitProgram() {
-        String confirm = InputHelper.getRegExString(scan, "Are you sure you want to quit? [Y/N]: ", "[YyNn]");
+    private static void clearList() {
+
+        if (items.isEmpty()) {
+            System.out.println("List is already empty.");
+            return;
+        }
+
+        String confirm = InputHelper.getRegExString(
+                scan,
+                "Clear entire list? [Y/N]: ",
+                "[YyNn]"
+        );
+
+        if (confirm.equalsIgnoreCase("Y")) {
+            items.clear();
+            fileEdited = true;
+            fileSaved = false;
+            fileLoaded = false;
+            currentFilename = null;
+            System.out.println("List cleared.");
+        }
+    }
+
+    private static void openFile() throws IOException {
+
+        if (fileEdited) {
+            String saveFirst = InputHelper.getRegExString(
+                    scan,
+                    "You have unsaved changes. Save first? [Y/N]: ",
+                    "[YyNn]"
+            );
+
+            if (saveFirst.equalsIgnoreCase("Y")) {
+                saveFile();
+            }
+        }
+
+        items.clear();
+        currentFilename = IOHelper.openFile(items);
+
+        fileLoaded = true;
+        fileEdited = false;
+        fileSaved = true;
+
+        System.out.println("Loaded file: " + currentFilename);
+    }
+
+    private static void saveFile() throws IOException {
+
+        if (currentFilename == null) {
+            JFileChooser chooser = new JFileChooser();
+            File workingDirectory = new File(System.getProperty("user.dir"));
+            chooser.setCurrentDirectory(workingDirectory);
+
+            if (chooser.showSaveDialog(null) == JFileChooser.APPROVE_OPTION) {
+                File file = chooser.getSelectedFile();
+                currentFilename = file.getName();
+
+                if (!currentFilename.endsWith(".txt")) {
+                    currentFilename += ".txt";
+                }
+            } else {
+                System.out.println("Save cancelled.");
+                return;
+            }
+        }
+
+        IOHelper.writeFile(items, currentFilename);
+        fileSaved = true;
+        fileEdited = false;
+        fileLoaded = true;
+    }
+
+    private static boolean quitProgram() throws IOException {
+
+        if (fileEdited) {
+            String saveFirst = InputHelper.getRegExString(
+                    scan,
+                    "You have unsaved changes. Save before quitting? [Y/N]: ",
+                    "[YyNn]"
+            );
+
+            if (saveFirst.equalsIgnoreCase("Y")) {
+                saveFile();
+            }
+        }
+
+        String confirm = InputHelper.getRegExString(
+                scan,
+                "Are you sure you want to quit? [Y/N]: ",
+                "[YyNn]"
+        );
+
         return confirm.equalsIgnoreCase("Y");
     }
 }
